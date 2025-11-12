@@ -1,0 +1,25 @@
+
+services:
+  backend:
+    build: ./backend/fileserver
+    container_name: backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./files:/app/files
+    networks:
+      - app-net
+      
+  frontend:
+    build: ./frontend/react-file-download
+    container_name: frontend
+    ports:
+      - "80:80"   # React + Nginx inside one container
+    depends_on:
+      - backend
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
