@@ -14,6 +14,6 @@ public class FIleRouter {
     @Bean
     public RouterFunction<ServerResponse> fileRoutes(FileHandler fileHandler){
         return RouterFunctions
-                .route(GET("api/files/{filename}"), fileHandler::downloadFile);
+                .route(GET("/api/files/{filename}"), fileHandler::downloadFile);
     }
 }

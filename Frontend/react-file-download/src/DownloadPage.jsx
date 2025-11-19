@@ -1,15 +1,31 @@
 import { useState } from "react";
+import axios from "axios";
 
 export default function DownloadPage() {
-  const [filename, setFilename] = useState("VisioPro2021Retail.img");
+  const [filename, setFilename] = useState("tanzim.png");
 
-  const downloadFile = () => {
-    const url = `/api/files/${filename}`; //for dev `http://192.168.1.245:8080/api/files/${filename}`
-    console.log("Downloading from URL:", url);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename; // browser handles large files
-    a.click();
+  const downloadFile = async () => {
+    try {
+      const url = `/api/files/${filename}`; // for dev: http://192.168.1.245:8080/api/files/${filename}
+      console.log("Downloading from URL:", url);
+
+      const response = await axios.get(url, {
+        responseType: "blob", // important for binary files
+      });
+
+      // Create a link and trigger download
+      const blob = new Blob([response.data]);
+      const link = document.createElement("a");
+      link.href = window.URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+
+      // Cleanup
+      window.URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error("Download failed:", error);
+      alert("File download failed. Check filename or server status.");
+    }
   };
 
   return (

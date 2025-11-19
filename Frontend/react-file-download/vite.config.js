@@ -12,8 +12,4 @@ export default defineConfig({
     }),
     tailwindcss(),
   ],
-    server: {
-    host: true, // listen on all interfaces
-    port: 5173,
-  },
 })
