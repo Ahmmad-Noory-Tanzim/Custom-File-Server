@@ -1,0 +1,74 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main  # triggers on push to main branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up Java
+      - name: Set up Java
+        uses: actions/setup-java@v3
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+
+      # 3️⃣ Build backend
+      - name: Build Backend
+        run: |
+        /backend/fileserver
+        mvn clean package -DskipTests
+
+      # 4️⃣ Set up Node.js
+      - name: Set up Node
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'
+
+      # 5️⃣ Build frontend
+      - name: Build Frontend
+        run: |
+          cd frontend/react-file-download/
+          npm install
+          npm run build
+
+      # 6️⃣ Build Docker images
+      - name: Build Docker images
+        run: |
+          docker build -t mybackend:latest ./backend/fileserver
+          docker build -t myfrontend:latest ./frontend/react-file-download
+          
+      # 7️⃣ Push Docker images to registry
+      - name: Push Docker images
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push Backend Image
+        run: docker push mydockerhubuser/mybackend:latest
+
+      - name: Push Frontend Image
+        run: docker push mydockerhubuser/myfrontend:latest
+
+
+
+      # 7️⃣ Deploy to server
+      - name: Deploy to EC2 / Linux server
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            docker pull mybackend:latest
+            docker pull myfrontend:latest
+            docker-compose -f /home/ubuntu/fullstack-inv/docker-compose.yml up -d
