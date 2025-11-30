@@ -3,7 +3,7 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main  # triggers on push to main branch
+      - main
 
 jobs:
   build-and-deploy:
@@ -15,60 +15,85 @@ jobs:
         uses: actions/checkout@v3
 
       # 2️⃣ Set up Java
-      - name: Set up Java
+      - name: Set up Java 24
         uses: actions/setup-java@v3
         with:
-          java-version: '25'
+          java-version: '24'
           distribution: 'temurin'
 
-      # 3️⃣ Build backend
+      # 3️⃣ Build Backend
       - name: Build Backend
         run: |
-        /backend/fileserver
-        mvn clean package -DskipTests
+          cd backend/fileserver
+          mvn clean package -DskipTests
 
       # 4️⃣ Set up Node.js
-      - name: Set up Node
+      - name: Set up Node.js 22
         uses: actions/setup-node@v3
         with:
           node-version: '22'
+          cache: 'npm'
 
-      # 5️⃣ Build frontend
+      # 5️⃣ Build Frontend
       - name: Build Frontend
         run: |
-          cd frontend/react-file-download/
+          cd frontend/react-file-download
           npm install
           npm run build
 
-      # 6️⃣ Build Docker images
-      - name: Build Docker images
-        run: |
-          docker build -t mybackend:latest ./backend/fileserver
-          docker build -t myfrontend:latest ./frontend/react-file-download
-          
-      # 7️⃣ Push Docker images to registry
-      - name: Push Docker images
+      # 6️⃣ Login to DockerHub
+      - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      # 7️⃣ Build and Tag Docker images
+      - name: Build Docker Images
+        run: |
+          docker build -t mydockerhubuser/mybackend:latest ./backend/fileserver
+          docker build -t mydockerhubuser/myfrontend:latest ./frontend/react-file-download
+
+      # 8️⃣ Push Docker images
       - name: Push Backend Image
         run: docker push mydockerhubuser/mybackend:latest
 
       - name: Push Frontend Image
         run: docker push mydockerhubuser/myfrontend:latest
 
-
-
-      # 7️⃣ Deploy to server
-      - name: Deploy to EC2 / Linux server
+      # 9️⃣ Test SSH Connection (IPv6)
+      - name: Test SSH Connection
         uses: appleboy/ssh-action@v0.1.7
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
+          script: echo "SSH connection to server works!"
+
+      # 🔟 Deploy to Server (IPv6-ready Docker Compose)
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 22
           script: |
-            docker pull mybackend:latest
-            docker pull myfrontend:latest
-            docker-compose -f /home/ubuntu/fullstack-inv/docker-compose.yml up -d
+            echo "Stopping old containers..."
+            cd /home/ubuntu/fullstack-inv
+            docker-compose down --remove-orphans
+
+            echo "Pulling latest Docker images..."
+            docker pull mydockerhubuser/mybackend:latest
+            docker pull mydockerhubuser/myfrontend:latest
+
+            echo "Starting containers with IPv6 network enabled..."
+            # Ensure Docker Compose creates an IPv6-enabled network
+            docker network create \
+              --ipv6 \
+              --subnet="2001:db8:1::/64" \
+              fullstack-net || true
+
+            docker-compose up -d --remove-orphans --build
+            echo "Deployment complete!"

@@ -45,7 +45,7 @@ services:
       - app-net
     command: tunnel run myapp
     volumes:
-      - ./cloudflared:/etc/cloudflared  # contains config.yml, cert.pem, tunnel.json
+      - /home/starpc/.cloudflared:/etc/cloudflared:ro  # contains config.yml, cert.pem, tunnel.json
     restart: unless-stopped
 
 # ---------------- Docker Network ----------------
